@@ -1,0 +1,134 @@
+#!/bin/sh
+#| -*- scheme -*- |#
+:; exec gosh -- $0 "$@"
+;;
+;;  Copyright (c) 2011 Masatake YAMATO
+;;
+;;  Permission is hereby granted, free of charge, to any person obtaining a copy
+;;  of this software and associated documentation files (the "Software"), to deal
+;;  in the Software without restriction, including without limitation the rights
+;;  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+;;  copies of the Software, and to permit persons to whom the Software is
+;;  furnished to do so, subject to the following conditions:
+;;
+;;  The above copyright notice and this permission notice shall be included in
+;;  all copies or substantial portions of the Software.
+;;
+;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+;;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+;;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+;;  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+;;  THE SOFTWARE.
+;;
+
+;;
+;; lscheme2js prints the name of procs defined in scheme2js runtime
+;;
+;; The printed names are converted from js style notation to scheme style notation.
+;;
+
+(use srfi-13)
+(use srfi-1)
+(use text.tree)
+
+(define (funcname->tree name)
+  (let loop ((name name)
+	     (question #f)
+	     (bang #f)
+	     (body (list)))
+    (rxmatch-cond
+      ((#/^$/ name)
+       (#f)
+       (append (reverse body)
+	       (list (cond
+		      (question "?")
+		      (bang "!")
+		      (else "")))))
+     ;;
+      ((#/^(has|is)([A-Z])(.*)/ name)	;|
+       (#f #f c rest)
+       (loop (string-append
+	      (string-downcase c)
+	      rest)
+	     #t
+	     bang
+	     body))
+     ;;
+     ((#/^2(.*)/ name)
+      (#f rest)
+      (loop rest
+	    question
+	    bang
+	    (cons "->" body)))
+     ((#/^_(.*)/ name)
+      (#f rest)
+      (loop rest
+	    question
+	    bang
+	    (cons "-" body)))
+     ;;
+     ((#/^Bang(.*)/ name)
+      (#f rest)
+      (loop rest
+	    question
+	    #t
+	    body))
+     ;;
+     ((#/^([A-Z])(.*)/ name)
+      (#f c rest)
+      (loop rest
+	    question
+	    bang
+	    (cons* (string-downcase c)
+		   "-"
+		   body)))
+     ;;
+     ((#/^([^A-Z2_]+)([A-Z2_].*)/ name)
+      (#f c rest)
+      (loop rest
+	    question
+	    bang
+	    (cons c body)))
+     (else
+      (loop ""
+	    question
+	    bang
+	    (cons name body))
+      ))))
+
+(define (list-api file)
+  (map
+   (cute string-append <> #`" ; ,(sys-basename file)")
+   (with-input-from-file file
+     (cut (rec (loop line meta? result)
+	       (cond
+		((eof-object? line)
+		 result)
+		((and (string-prefix? "/*** META ((export " line)
+		      (not (string-prefix? "/*** META ((export #" line)))
+		 (let1 exported (substring line (string-length "/*** META ((export ")
+					   (string-length line))
+		   ;; TODO
+		   (loop (read-line) #f (cons ((#/^([^\) ]+).*/ exported) 1) result))
+		   ))
+		((string-prefix? "/*** META " line)
+		 (loop (read-line) #t result))
+		((and (string-prefix? "function sc_" line)
+		      meta?)
+		 (loop (read-line) #f
+		       (cons (tree->string (funcname->tree ((#/function sc_([^\)]+)\(/ line) 1)))
+			     result)))
+		(else
+		 (loop (read-line) meta? result))))
+	  (read-line)
+	  #f
+	  (list)))))
+
+(for-each print
+	  (sort (append (list-api "/usr/share/scheme2js/runtime.js")
+			(list-api "/usr/share/scheme2js/runtime_interface.js")
+			(list-api "/usr/share/scheme2js/runtime_callcc.js")
+			(list-api "/usr/share/scheme2js/runtime_interface_callcc.js"))
+		string<))

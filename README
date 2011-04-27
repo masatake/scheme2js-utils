@@ -1,0 +1,6 @@
+Tools helping scheme2js scripting
+
+      - lscheme2js lists all available scheme functions defined in scheme2js runtime.
+      - ischeme2js runs a scheme script given from command line, no web browser is needed.
+
+Mastake YAMATO

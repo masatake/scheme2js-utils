@@ -1,0 +1,7 @@
+(name "scheme2js-utils")
+(version "0.0.1")
+(require "scheme2js")
+(require "gauche")
+(require "js")
+(entry "ischeme2js" "/usr/bin/ischeme2js" #f)
+(entry "lscheme2js" "/usr/bin/lscheme2js" #f)

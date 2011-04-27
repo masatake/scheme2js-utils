@@ -1,0 +1,128 @@
+#!/bin/bash
+#
+#  Copyright (c) 2011 Masatake YAMATO
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in
+#  all copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#  THE SOFTWARE.
+#
+
+MY_TMPDIR=$(mktemp --directory --suffix=.ischeme2js)
+trap "/bin/rm -rf ${MY_TMPDIR}" 0
+
+SCHEME2JS_RUNTIME=/usr/share/scheme2js/runtime.js
+DUMP=
+SCHEME2JS_ARGS=
+JS_ARGS=
+SCM_INPUT=
+ARGS=
+
+function print_usage
+{
+    echo "$0 compiles a scheme program with scheme2js and run the generated js program with js"
+    echo
+    echo "Usage: "
+    echo "	$0 --help|-h"
+    echo "	$0 --dump [--scheme2js=SCHEME2JS_ARGS] SCM"
+    echo "	$0 [--scheme2js=SCHEME2JS_ARGS]  [--js=JS_ARGS] SCM ARGS..."
+    echo
+    echo "Tips: "
+    echo "	To access ARGS from scheme script:" '(js-field *js* "arguments")'
+}
+
+function parse_arguments
+{
+    while [ $# -gt 0 ]; do
+	case "$1" in
+	    (--help|-h)
+		print_usage
+		exit 0
+		;;
+	    (--dump)
+		DUMP=1
+		;;
+	    (--scheme2js=*)
+	        SCHEME2JS_ARGS=${1/--scheme2js=/}
+		;;
+	    (--js=*)
+	        JS_ARGS=${1/--js=}
+		;;
+	    (--*)
+	        echo "unknown long option: $1" 1>&2
+		print_usage 1>&2
+		exit 1
+		;;
+	    -*)
+	        echo "unknown short option: $1" 1>&2
+		print_usage 1>&2
+		exit 1
+		;;
+	    *)
+		break
+		;;
+	esac
+	shift
+    done
+    
+    SCM_INPUT=$1
+    shift
+
+    if [ -z "$SCM_INPUT" ]; then
+	echo "no input file given" 1>&2
+	print_usage 1>&2
+	exit 1
+    fi
+
+    ARGS=$@
+}
+
+function prepare_io
+{
+    # TODO:
+    # - input
+    # - putc...
+    cat <<EOF
+SC_DEFAULT_OUT = new sc_GenericOutputPort(print);
+SC_ERROR_OUT = SC_DEFAULT_OUT;
+EOF
+}
+
+function main
+{
+    
+    parse_arguments "$@"
+
+    
+    if ! scheme2js $SCHEME2JS_ARGS -o - $SCM_INPUT > ${MY_TMPDIR}/a.js; then
+	return 2
+    fi
+    
+    if [ -n "$DUMP" ]; then
+	cat ${MY_TMPDIR}/a.js
+	return 2
+    fi
+
+    prepare_io > ${MY_TMPDIR}/io.js
+
+    # We expect spidermonkey.
+    js -f ${SCHEME2JS_RUNTIME} -f ${MY_TMPDIR}/io.js ${MY_TMPDIR}/a.js $ARGS
+
+    return $?
+}
+
+main "$@"
+exit $?

@@ -1,6 +1,45 @@
-Tools helping scheme2js scripting
+scheme2js-utils is a collection of commands helping scheme2js scripting.
+lscheme2js and ischeme2js are included.
 
-      - lscheme2js lists all available scheme functions defined in scheme2js runtime.
-      - ischeme2js runs a scheme script given from command line, no web browser is needed.
+* lscheme2js 
 
-Mastake YAMATO
+  This lists all available scheme symbols defined in scheme2js runtime.
+  Currently gauche is required. This should be replaced with scheme2js 
+  itself.
+
+    $ lscheme2js | tail
+    with-output-to-procedure ; runtime.js
+    with-output-to-procedure ; runtime_callcc.js
+    with-output-to-procedure ; runtime_interface_callcc.js
+    with-output-to-string ; runtime.js
+    with-output-to-string ; runtime_callcc.js
+    with-output-to-string ; runtime_interface_callcc.js
+    write ; runtime.js
+    write-char ; runtime.js
+    write-circle ; runtime.js
+    zero? ; runtime.js
+
+
+* ischeme2js
+
+  This runs scheme2js as if it is interpreter.
+  It invoke scheme2js compiler to compile a given scheme script into a js script
+  then invokes rhino js interpreter to run the js script.
+  ischeme2js is command line tool, no web browser is needed: stdio are established
+  internally.
+
+    $ cat a.scm
+    (display (cons 'x (read)))(newline)
+    (display (cons 'y (read)))(newline)
+    (display (cons 'z (read)))(newline)
+    $ cat input
+    (a)
+    (b)
+    (c)
+    $ ischeme2js a.scm < input
+    (x a)
+    (y b)
+    (z c)
+
+Masatake YAMATO <yamato@redhat.com>
+

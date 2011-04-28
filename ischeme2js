@@ -21,6 +21,9 @@
 #  THE SOFTWARE.
 #
 
+JS=${JS:-rhino}
+SCHEME2JS=${SCHEME2JS:-scheme2js}
+
 MY_TMPDIR=$(mktemp --directory --suffix=.ischeme2js)
 trap "/bin/rm -rf ${MY_TMPDIR}" 0
 
@@ -96,9 +99,58 @@ function prepare_io
     # TODO:
     # - input
     # - putc...
-    cat <<EOF
-SC_DEFAULT_OUT = new sc_GenericOutputPort(print);
-SC_ERROR_OUT = SC_DEFAULT_OUT;
+    cat <<"EOF"
+SC_DEFAULT_OUT = new sc_GenericOutputPort(
+    function(s) {
+	java.lang.System.out.print(s);
+    });
+
+SC_ERROR_OUT   = new sc_GenericOutputPort(
+    function(s) {
+	java.lang.System.err.print(s);
+    });
+
+SC_DEFAULT_IN = (function () {
+    var i = new sc_InputPort();
+    var bi   = new java.io.BufferedReader(new java.io.FileReader("/dev/stdin"));
+
+    i.getNextChar = (function () {
+	var line = false;
+        var f = function() {
+	    var e;
+
+	    while (true) {
+		if ( line === null ) {
+		    e = SC_EOF_OBJECT;
+		    break;
+		} 
+
+		if (line === false) {
+		    var l = bi.readLine();
+
+		    if (l != null) {
+			line = new sc_StringInputPort(l);
+		    } else {
+			line = null;
+		    }
+		    continue;
+		}
+
+		e = line.getNextChar();
+		if (e === SC_EOF_OBJECT) {
+		    line = false
+		    continue;
+		} 
+		
+		break;
+	    }
+	    
+	    return e;
+        };
+	return f;
+    })();
+    return i;
+})();
 EOF
 }
 
@@ -108,7 +160,7 @@ function main
     parse_arguments "$@"
 
     
-    if ! scheme2js $SCHEME2JS_ARGS -o - $SCM_INPUT > ${MY_TMPDIR}/a.js; then
+    if ! ${SCHEME2JS} $SCHEME2JS_ARGS -o - $SCM_INPUT > ${MY_TMPDIR}/a.js; then
 	return 2
     fi
     
@@ -119,8 +171,7 @@ function main
 
     prepare_io > ${MY_TMPDIR}/io.js
 
-    # We expect spidermonkey.
-    js -f ${SCHEME2JS_RUNTIME} -f ${MY_TMPDIR}/io.js ${MY_TMPDIR}/a.js $ARGS
+    ${JS} -f ${SCHEME2JS_RUNTIME} -f ${MY_TMPDIR}/io.js ${MY_TMPDIR}/a.js $ARGS
 
     return $?
 }

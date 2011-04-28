@@ -128,6 +128,11 @@
 		 (loop (read-line) #f
 		       (cons (tree->string (funcname->tree ((#/function sc_([^\)]+)\(/ line) 1)))
 			     result)))
+		((and (string-prefix? "var sc_" line)
+		      meta?)
+		 (loop (read-line) #f
+		       (cons (tree->string (funcname->tree ((#/var sc_([^ ]+) = / line) 1)))
+			     result)))
 		(else
 		 (loop (read-line) meta? result))))
 	  (read-line)

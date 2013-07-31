@@ -21,13 +21,24 @@
 #  THE SOFTWARE.
 #
 
+USE_SCHEME2JS=
+if which scheme2js > /dev/null 2>&1 ; then
+    USE_SCHEME2JS=yes
+fi
+
 JS=${JS:-rhino}
-SCHEME2JS=${SCHEME2JS:-scheme2js}
+
+if [[ -n "${USE_SCHEME2JS}" ]]; then
+    SCHEME2JS=${SCHEME2JS:-scheme2js}
+    SCHEME2JS_RUNTIME=${SCHEME2JS_RUNTIME:-/usr/share/scheme2js/runtime.js}
+else
+    HOPC=${HOPC:=hopc}
+    SCHEME2JS_RUNTIME=${SCHEME2JS_RUNTIME:-/usr/share/hop/runtime.js}
+fi
 
 MY_TMPDIR=$(mktemp --directory --suffix=.ischeme2js)
 trap "/bin/rm -rf ${MY_TMPDIR}" 0
 
-SCHEME2JS_RUNTIME=/usr/share/scheme2js/runtime.js
 DUMP=
 SCHEME2JS_ARGS=
 JS_ARGS=
@@ -92,6 +103,14 @@ function parse_arguments
     fi
 
     ARGS=$@
+}
+
+function prepare_var
+{
+    cat <<"EOF"
+window = new Object();
+console = new Object();
+EOF
 }
 
 function prepare_io
@@ -159,9 +178,15 @@ function main
     
     parse_arguments "$@"
 
-    
-    if ! ${SCHEME2JS} $SCHEME2JS_ARGS -o - $SCM_INPUT > ${MY_TMPDIR}/a.js; then
-	return 2
+
+    if [[ -n "${USE_SCHEME2JS}" ]]; then
+	if ! ${SCHEME2JS} $SCHEME2JS_ARGS -o - $SCM_INPUT > ${MY_TMPDIR}/a.js; then
+	    return 2
+	fi
+    else
+	if ! ${HOPC} -j $SCHEME2JS_ARGS -o /dev/stdout $SCM_INPUT > ${MY_TMPDIR}/a.js; then
+	    return 2
+	fi
     fi
     
     if [ -n "$DUMP" ]; then
@@ -169,9 +194,10 @@ function main
 	return 2
     fi
 
+    prepare_var > ${MY_TMPDIR}/var.js
     prepare_io > ${MY_TMPDIR}/io.js
 
-    ${JS} -f ${SCHEME2JS_RUNTIME} -f ${MY_TMPDIR}/io.js ${MY_TMPDIR}/a.js $ARGS
+    ${JS} -f ${MY_TMPDIR}/var.js -f ${SCHEME2JS_RUNTIME} -f ${MY_TMPDIR}/io.js ${MY_TMPDIR}/a.js $ARGS
 
     return $?
 }

@@ -33,13 +33,15 @@
 (use srfi-1)
 (use text.tree)
 
-(define scheme2js-runtime-dir "/usr/share/scheme2js")
-(define scheme2js-runtime-files  (map (lambda (f)
-					(string-append scheme2js-runtime-dir "/" f))
-				      '("runtime.js"
-				       "runtime_interface.js"
-				       "runtime_callcc.js"
-				       "runtime_interface_callcc.js")))
+(define (make-path dir files)
+  (map (cute string-append dir "/" <>) files))
+
+(define scheme2js-runtime-files (make-path "/usr/share/scheme2js"
+					   '("runtime.js"
+					     "runtime_interface.js"
+					     "runtime_callcc.js"
+					     "runtime_interface_callcc.js")))
+(define hop-runtime-files (make-path "/usr/share/hop" '("runtime.js")))
 
 (define (funcname->tree name)
   (let loop ((name name)
@@ -139,9 +141,16 @@
 	  #f
 	  (list)))))
 
+(define (if-exist f proc)
+  (if (file-exists? f)
+      (proc f)
+      '("")))
 (for-each print
 	  (sort (apply 
 		 append 
-		 (map list-api
-		      scheme2js-runtime-files))
+		 (map (cute if-exist <> list-api)
+		      (append 
+		       scheme2js-runtime-files
+		       hop-runtime-files
+		      )))
 		string<))

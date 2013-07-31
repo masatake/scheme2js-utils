@@ -1,6 +1,6 @@
 (name "scheme2js-utils")
-(version "0.0.3")
-(require "scheme2js")
+(version "0.0.4")
+(require "hop")
 (require "gauche")
 (require "rhino")
 (entry "ischeme2js" "/usr/bin/ischeme2js" #f)
